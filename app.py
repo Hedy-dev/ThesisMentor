@@ -74,20 +74,43 @@ if uploaded_file is not None:
                                     st.error(err['description'])
                                     st.caption(f"Статус: {err['error_status']}")
 
+                    # with col2:
+                    #     st.header("Советы Генератора")
+                    #     if not recommendations:
+                    #         st.info("Рекомендаций пока нет.")
+                    #     else:
+                    #         for i, rec in enumerate(recommendations):
+                    #             # Определяем заголовок: если есть исправленный текст, пишем "Улучшение", если нет — "Совет"
+                    #             is_structural = rec.get("is_structural", False)
+                    #             header = f"Совет #{i+1} (Структура)" if is_structural else f"Улучшение #{i+1}"
+
+                    #             with st.expander(header, expanded=True):
+                    #                 st.write(rec['recommendation']) # Тут будет текст от GigaChat
+                    #                 if not is_structural:
+                    #                     st.caption("Рекомендуется применить к узлу: " + rec['node_id'][:8])
                     with col2:
-                        st.header("Советы Генератора")
+                        st.header("Советы LISA AI")
                         if not recommendations:
-                            st.info("Рекомендаций пока нет.")
+                            st.info("Загрузите файл для получения рекомендаций.")
                         else:
                             for i, rec in enumerate(recommendations):
-                                # Определяем заголовок: если есть исправленный текст, пишем "Улучшение", если нет — "Совет"
-                                is_structural = rec.get("is_structural", False)
-                                header = f"Совет #{i+1} (Структура)" if is_structural else f"Улучшение #{i+1}"
+                                # Определяем иконку: стройка для структуры, перо для текста
+                                is_struct = rec.get("is_structural", False)
+                                icon = "🏗️" if is_struct else "✍️"
 
-                                with st.expander(header, expanded=True):
-                                    st.write(rec['recommendation']) # Тут будет текст от GigaChat
-                                    if not is_structural:
-                                        st.caption("Рекомендуется применить к узлу: " + rec['node_id'][:8])
+                                with st.expander(f"{icon} Рекомендация #{i+1}", expanded=True):
+                                    text_content = rec['suggestion']
+
+                                    if "Исправленный текст:" in text_content:
+                                        # Разделяем совет и сам текст для красоты
+                                        parts = text_content.split("Исправленный текст:")
+                                        st.markdown(f"**Анализ:** {parts[0].replace('Совет:', '').strip()}")
+                                        st.success(f"**Вариант для вставки:**\n\n{parts[1].strip()}")
+                                    else:
+                                        st.write(text_content)
+
+                                    if rec.get("sources"):
+                                        st.caption(f"Источник: {', '.join(rec['sources'])}")
                 else:
                     # Обработка HTTP-ошибок от бэкенда
                     st.error(f"Ошибка бэкенда: {response.status_code} - {response.text}")
