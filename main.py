@@ -8,7 +8,7 @@ from core.critic import CriticManager
 from core.generator_giga import GeneratorManager 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv("config.env")
 app = FastAPI(title="LISA AI Thesis Critic API")
 
 app.add_middleware(
@@ -18,22 +18,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("Инициализация систем")
-try:
-    parser = ThesisParser()
-    critic = CriticManager()
-    generator = GeneratorManager()
-    
-    # Наполняем базу знаний правилами из методички (если она пустая)
-    generator.add_manual_rules()
-    
-    print("Все системы запущены")
-except Exception as e:
-    print(f"ОШИБКА: {e}")
-    traceback.print_exc()
+parser = None
+critic = None
+generator = None
+
+@app.on_event("startup")
+async def startup_event():
+    global parser, critic, generator
+    print("Инициализация систем...")
+    try:
+        parser = ThesisParser()
+        critic = CriticManager()
+        generator = GeneratorManager()
+        generator.add_manual_rules()
+        print("Все системы успешно запущены")
+    except Exception as e:
+        print(f"КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ: {e}")
+        traceback.print_exc()
+        # В рабочем окружении здесь можно даже завершить процесс sys.exit(1)
 
 @app.post("/analyze")
 async def analyze_document(file: UploadFile = File(...)):
+    # Проверка, что системы инициализированы
+    if any(s is None for s in [parser, critic, generator]):
+        raise HTTPException(status_code=503, detail="Сервис не готов: ошибка инициализации компонентов")    
     """
     Парсинг -> Критика -> Генерация советов
     """
