@@ -1,12 +1,16 @@
 import io
+import uvicorn
+import traceback
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from core.parser import ThesisParser
 from core.critic import CriticManager
+from core.generator_giga import GeneratorManager 
+from dotenv import load_dotenv
 
+load_dotenv()
 app = FastAPI(title="LISA AI Thesis Critic API")
 
-# Настройка CORS для работы с Streamlit или фронтендом
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,59 +18,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Инициализируем компоненты один раз при старте сервера
-# Это экономит ресурсы, так как модель NLI тяжелая
-parser = ThesisParser()
-critic = CriticManager()
+print("Инициализация систем")
+try:
+    parser = ThesisParser()
+    critic = CriticManager()
+    generator = GeneratorManager()
+    
+    # Наполняем базу знаний правилами из методички (если она пустая)
+    generator.add_manual_rules()
+    
+    print("Все системы запущены")
+except Exception as e:
+    print(f"ОШИБКА: {e}")
+    traceback.print_exc()
 
 @app.post("/analyze")
 async def analyze_document(file: UploadFile = File(...)):
     """
-    Основной эндпоинт: 
-    1. Принимает .docx файл
-    2. Строит граф структуры через ThesisParser
-    3. Проверяет правила через CriticManager
-    4. Генерирует рекомендации на основе найденных ошибок
+    Парсинг -> Критика -> Генерация советов
     """
     if not file.filename.endswith('.docx'):
         raise HTTPException(status_code=400, detail="Допустимы только файлы .docx")
 
     try:
-        # Читаем содержимое файла в память
         file_content = await file.read()
         file_stream = io.BytesIO(file_content)
 
-        # Получаем структуру: {"root_id": ..., "nodes": {id: node_dict}}
+        # Парсим структуру в граф
+        print(f"Обработка файла: {file.filename}")
         graph = parser.parse(file_stream)
 
-        # Прогоняет Rule 1 (и все будущие правила), возвращает список ошибок
-        # Ошибка содержит node_id практического раздела (заголовка)
+        # Ищем нарушения правил (Критик)
         errors = critic.run_all(graph)
 
-        # Формируем рекомендации, привязанные к конкретным узлам
-        recommendations = []
-        for error in errors:
-            target_node = graph["nodes"].get(error["node_id"])
-            section_title = target_node["title"] if target_node else "неизвестного раздела"
-            
-            recommendations.append({
-                "error_id": error["node_id"], # ID узла-заголовка практического раздела
-                "suggestion": (
-                    f"В разделе '{section_title}' описаны практические результаты. "
-                    f"Необходимо добавить краткое резюме этих результатов в главу 'ВВЕДЕНИЕ', "
-                    f"чтобы обеспечить целостность работы."
-                ),
-                "type": "structural_consistency"
-            })
+        # Генерируем рекомендации (Генератор)
+        # передаем и список ошибок, и сам граф для доступа к текстам
+        recommendations = generator.generate_recommendations_from_errors(errors, graph)
 
-        # Возвращаем полный пакет данных для фронтенда
+        # Формируем ответ
         return {
             "filename": file.filename,
             "status": "success",
             "results": {
                 "errors": errors,
                 "recommendations": recommendations,
-                # Отправляем небольшое превью графа для отладки на фронте
                 "nodes_count": len(graph["nodes"]),
                 "detected_sections": [
                     {"id": n["id"], "title": n["title"]} 
@@ -76,19 +71,22 @@ async def analyze_document(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        # Логируем ошибку для разработки
-        print(f"Error during analysis: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Ошибка при анализе документа: {str(e)}")
+        print(f"Ошибка при анализе: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
 
 @app.get("/health")
 async def health_check():
-    """Проверка доступности сервиса и статуса модели"""
+    """Проверка жизни сервиса"""
     return {
         "status": "online",
-        "device": critic.device,
-        "rules_loaded": [type(r).__name__ for r in critic.rules]
+        "components": {
+            "parser": "ok",
+            "critic": "ok",
+            "generator": "ok"
+        }
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Если запуск из-под Docker 0.0.0.0
+    uvicorn.run(app, host="127.0.0.1", port=8000)
