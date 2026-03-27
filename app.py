@@ -1,10 +1,10 @@
 import streamlit as st
 import requests
 
-# 1. Настройка внешнего вида страницы
+# Настройка внешнего вида страницы
 st.set_page_config(
     page_title="AI Рецензент ВКР",
-    page_icon="🎓",
+    # page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -12,13 +12,13 @@ st.set_page_config(
 # URL  FastAPI бэкенда
 BACKEND_URL = "http://localhost:8000/analyze"
 
-st.title("🎓 ИИ-Ядро: Проверка структуры ВКР")
+st.title("Проверка структуры ВКР")
 st.markdown(
     "Загрузите файл вашей работы в формате `.docx`, чтобы модель-критик проверила "
     "соответствие структуры и содержания практических глав тексту введения."
 )
 
-# 2.  для отладочной информации (показывает работу парсера)
+# для отладочной информации
 with st.sidebar:
     st.header(" Отладка парсера")
     st.info("структура документа после обработки.")
@@ -45,7 +45,7 @@ if uploaded_file is not None:
                 # Отправка POST-запроса на бэкенд
                 response = requests.post(BACKEND_URL, files=files)
                 
-                # 4. Обработка успешного ответа
+                # Обработка успешного ответа
                 if response.status_code == 200:
                     data = response.json()
                     results = data.get("results", {})
@@ -61,7 +61,7 @@ if uploaded_file is not None:
                         for sec in results.get("detected_sections", []):
                             st.text(f"🔹 {sec['title']}")
 
-                    # 5. Разделение экрана на две колонки для вывода Критика и Генератора
+                    # Разделение экрана на две колонки для вывода Критика и Генератора
                     col1, col2 = st.columns(2)
                     
                     with col1:
@@ -70,19 +70,24 @@ if uploaded_file is not None:
                             st.success("Отлично! Структурных ошибок не найдено.")
                         else:
                             for i, err in enumerate(errors):
-                                # Используем expander для красивой подачи
                                 with st.expander(f"Недочет #{i+1} (Узел: {err['node_id'][:8]}...)", expanded=True):
                                     st.error(err['description'])
                                     st.caption(f"Статус: {err['error_status']}")
 
                     with col2:
-                        st.header("💡 Советы Генератора")
+                        st.header("Советы Генератора")
                         if not recommendations:
                             st.info("Рекомендаций пока нет.")
                         else:
-                            for rec in recommendations:
-                                st.info(f"**Рекомендация:** {rec['suggestion']}")
-                                
+                            for i, rec in enumerate(recommendations):
+                                # Определяем заголовок: если есть исправленный текст, пишем "Улучшение", если нет — "Совет"
+                                is_structural = rec.get("is_structural", False)
+                                header = f"Совет #{i+1} (Структура)" if is_structural else f"Улучшение #{i+1}"
+
+                                with st.expander(header, expanded=True):
+                                    st.write(rec['recommendation']) # Тут будет текст от GigaChat
+                                    if not is_structural:
+                                        st.caption("Рекомендуется применить к узлу: " + rec['node_id'][:8])
                 else:
                     # Обработка HTTP-ошибок от бэкенда
                     st.error(f"Ошибка бэкенда: {response.status_code} - {response.text}")
