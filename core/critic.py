@@ -4,6 +4,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from .rules.structure_rule  import MandatorySectionsRule
 from .rules.style_rule import PersonalPronounsRule
 from .rules.intro_LLM_rule import IntroLLMRule
+from .rules.business_methodology_rule import BusinessMethodologyRule
 
 class CriticManager:
     def __init__(self):
@@ -17,6 +18,7 @@ class CriticManager:
             # PracticeIntroRule(self.model, self.tokenizer, self.device),
             IntroLLMRule(self.model, self.tokenizer, self.device),
             PersonalPronounsRule(self.model, self.tokenizer, self.device),
+            BusinessMethodologyRule(self.model, self.tokenizer, self.device),
             MandatorySectionsRule(self.model, self.tokenizer, self.device)
         ]
 
