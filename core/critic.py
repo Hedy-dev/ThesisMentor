@@ -1,7 +1,9 @@
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 from typing import List, Dict
-from .rules.rule_1 import PracticeIntroRule
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from .rules.structure_rule  import MandatorySectionsRule
+from .rules.style_rule import PersonalPronounsRule
+from .rules.intro_LLM_rule import IntroLLMRule
 
 class CriticManager:
     def __init__(self):
@@ -12,8 +14,10 @@ class CriticManager:
         
         # Регистрируем правила
         self.rules = [
-            PracticeIntroRule(self.model, self.tokenizer, self.device),
-            # Сюда просто добавляем новые классы правил
+            # PracticeIntroRule(self.model, self.tokenizer, self.device),
+            IntroLLMRule(self.model, self.tokenizer, self.device),
+            PersonalPronounsRule(self.model, self.tokenizer, self.device),
+            MandatorySectionsRule(self.model, self.tokenizer, self.device)
         ]
 
     def run_all(self, graph: Dict) -> List[Dict]:
