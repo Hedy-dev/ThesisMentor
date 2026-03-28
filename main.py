@@ -7,8 +7,17 @@ from core.parser import ThesisParser
 from core.critic import CriticManager
 from core.generator_giga import GeneratorManager 
 from dotenv import load_dotenv
+import streamlit as st
+import os
 
-load_dotenv("config.env")
+# load_dotenv("config.env")
+# Load env locally, fallback to Streamlit secrets in cloud
+if not os.getenv("GIGACHAT_CREDENTIALS"):
+    try:
+        import streamlit as st
+        os.environ["GIGACHAT_CREDENTIALS"] = st.secrets["GIGACHAT_CREDENTIALS"]
+    except Exception:
+        pass
 app = FastAPI(title="LISA AI Thesis Critic API")
 
 app.add_middleware(
