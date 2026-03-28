@@ -47,7 +47,7 @@ python main.py
 После того как сервер успешно поднялся на порту 8000, запустите клиентскую часть:
 
 ```bash
-python app.py
+streamlit run app.py
 ```
 
 ---
