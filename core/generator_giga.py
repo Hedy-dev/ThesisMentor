@@ -1,6 +1,7 @@
 import os
 import time
 from typing import List, Dict
+from qdrant_client.models import Distance, VectorParams
 from gigachat import GigaChat 
 from langchain_core.documents import Document
 from dotenv import load_dotenv
@@ -45,6 +46,17 @@ class GeneratorManager:
 
     def _ensure_vector_store(self):
         if self.vector_store is None:
+
+            # СОЗДАЁМ КОЛЛЕКЦИЮ ЕСЛИ ЕЁ НЕТ
+            if not self.client.collection_exists(self.collection_name):
+                self.client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=312,  # ruBERT-tiny2 embedding size
+                        distance=Distance.COSINE
+                    )
+                )
+
             self.vector_store = QdrantVectorStore(
                 client=self.client,
                 collection_name=self.collection_name,
