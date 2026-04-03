@@ -5,7 +5,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from core.parser import ThesisParser
 from core.critic import CriticManager
-from core.generator_giga import GeneratorManager 
+from core.generator_giga import GeneratorManager
 from dotenv import load_dotenv
 import streamlit as st
 import os
@@ -29,6 +29,12 @@ generator = None
 @app.on_event("startup")
 async def startup_event():
     global parser, critic, generator
+if parser is None: parser = ThesisParser()
+if critic is None: critic = CriticManager()
+if generator is None:
+    generator = GeneratorManager()
+    generator.add_manual_rules()
+    global parser, critic, generator
     print("Инициализация систем...")
     try:
         parser = ThesisParser()
@@ -49,11 +55,11 @@ async def analyze_document(file: UploadFile = File(...)):
     """
     Парсинг -> Критика -> Генерация советов
     """
-    if not file.filename.endswith('.docx'):
+    if not file.name.endswith('.docx'):
         raise HTTPException(status_code=400, detail="Допустимы только файлы .docx")
 
     try:
-        file_content = await file.read()
+        file_content = file.read()
         file_stream = io.BytesIO(file_content)
 
         # Парсим структуру в граф
